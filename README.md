@@ -7,11 +7,19 @@ Nucleus is a single-file web app where each casino game fills the entire screen.
 ## Games
 ### GameMechanics
 🎰SlotsWeighted reel symbols, near-miss injection, auto-spin toggle
+
 🃏BlackjackFull rules — hit, stand, double down, dealer AI
+
 🎡Spin WheelCanvas-animated wheel, 12 segments, physics easing
-💣Mines5×5 grid, growing multiplier, cash out anytime🎲Dice DuelRoll against the house, animated dice
+
+💣Mines5×5 grid, growing multiplier, cash out anytime
+
+🎲Dice DuelRoll against the house, animated dice
+
 🃟Hi-LoGuess higher/lower, chain correct guesses to build multiplier
+
 🔵PlinkoPhysics-simulated ball drops through 8 rows of pins
+
 Games are shuffled into a random order every session. The feed is infinite — when you reach the end of a round, a new shuffled round is appended automatically.
 
 ## Features
