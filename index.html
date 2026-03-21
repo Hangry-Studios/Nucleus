@@ -199,7 +199,7 @@ body.dark #header {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: calc(56px + env(safe-area-inset-top) + 16px) 16px calc(16px + env(safe-area-inset-bottom));
+  padding: calc(56px + env(safe-area-inset-top) + 8px) 16px calc(34px + env(safe-area-inset-bottom));
   position: absolute;
   left: 0; right: 0;
   overflow: hidden;
@@ -1165,6 +1165,16 @@ body.dark .bw-inner {
   #wheel-cvs { width: 170px; height: 170px; }
 }
 
+
+/* ── BOTTOM SAFE AREA FILL ── */
+#bottom-fill {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  height: env(safe-area-inset-bottom, 0px);
+  background: var(--bg);
+  z-index: 999;
+  pointer-events: none;
+}
 </style>
 </head>
 <body>
@@ -1216,6 +1226,7 @@ body.dark .bw-inner {
 
 <!-- Scroll container -->
 <div id="scroll-wrap"></div>
+<div id="bottom-fill"></div>
 
 <script>
 'use strict';
