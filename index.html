@@ -2694,7 +2694,9 @@ if (localStorage.getItem('nuc_dark')==='1') {
     const c = document.createElement('canvas');
     c.width = c.height = size;
     const ctx = c.getContext('2d');
-    const cx = size/2, cy = size/2, s = size/512;
+    const cx = size/2, cy = size/2;
+    // All measurements are fractions of size (0..1 = 0..512 in design space)
+    const u = size / 512; // 1 design unit in canvas pixels
 
     // Background rounded rect
     const r = size * 0.225;
@@ -2709,52 +2711,51 @@ if (localStorage.getItem('nuc_dark')==='1') {
     ctx.fillStyle = '#000000';
     ctx.fill();
 
-    // Helper: draw ellipse orbit
-    function orbit(angle, rx, ry, color, alpha) {
+    // Draw orbit ellipse (rx/ry in design units 0-512)
+    function orbit(angleDeg, rx, ry, color) {
       ctx.save();
       ctx.translate(cx, cy);
-      ctx.rotate(angle * Math.PI / 180);
+      ctx.rotate(angleDeg * Math.PI / 180);
       ctx.beginPath();
-      ctx.ellipse(0, 0, rx*s*512, ry*s*512, 0, 0, Math.PI*2);
+      ctx.ellipse(0, 0, rx*u, ry*u, 0, 0, Math.PI*2);
       ctx.strokeStyle = color;
-      ctx.globalAlpha = alpha;
-      ctx.lineWidth = 3*s*512;
+      ctx.lineWidth = 8*u;
       ctx.stroke();
       ctx.restore();
-      ctx.globalAlpha = 1;
     }
 
-    // Helper: draw electron dot
-    function electron(angle, orbitAngle, rx, ry, color) {
+    // Draw electron at position on orbit
+    function electron(angleDeg, orbitAngleDeg, rx, ry, color) {
       ctx.save();
       ctx.translate(cx, cy);
-      ctx.rotate(orbitAngle * Math.PI/180);
-      const ex = Math.cos(angle) * rx*s*512;
-      const ey = Math.sin(angle) * ry*s*512;
+      ctx.rotate(orbitAngleDeg * Math.PI/180);
+      const a = angleDeg * Math.PI/180;
       ctx.beginPath();
-      ctx.arc(ex, ey, 12*s*512, 0, Math.PI*2);
+      ctx.arc(Math.cos(a)*rx*u, Math.sin(a)*ry*u, 18*u, 0, Math.PI*2);
       ctx.fillStyle = color;
       ctx.fill();
       ctx.restore();
     }
 
-    orbit(-30, 160, 60, '#007aff', 0.9);
-    orbit(30,  160, 60, '#007aff', 0.9);
-    orbit(90,  60, 160, '#007aff', 0.9);
+    // Three orbits
+    orbit(-30, 155, 58, '#007aff');
+    orbit(30,  155, 58, '#007aff');
+    orbit(90,  58, 155, '#007aff');
 
-    electron(-Math.PI/2, -30, 160, 60, '#007aff');
-    electron(Math.PI,     30, 160, 60, '#007aff');
-    electron(Math.PI/2,   90,  60, 160, '#5ac8fa');
+    // Three electrons
+    electron(-90, -30, 155, 58, '#60aaff');
+    electron(180,  30, 155, 58, '#60aaff');
+    electron(90,   90,  58, 155, '#5ac8fa');
 
-    // Nucleus glow
-    ctx.beginPath(); ctx.arc(cx, cy, 38*s*512, 0, Math.PI*2);
-    ctx.fillStyle = 'rgba(0,122,255,0.2)'; ctx.fill();
-    ctx.beginPath(); ctx.arc(cx, cy, 28*s*512, 0, Math.PI*2);
-    ctx.fillStyle = 'rgba(0,122,255,0.4)'; ctx.fill();
-    // Core white
-    ctx.beginPath(); ctx.arc(cx, cy, 20*s*512, 0, Math.PI*2);
+    // Nucleus glow layers
+    ctx.beginPath(); ctx.arc(cx, cy, 52*u, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(0,122,255,0.25)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, 38*u, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(0,122,255,0.5)'; ctx.fill();
+    // Core
+    ctx.beginPath(); ctx.arc(cx, cy, 26*u, 0, Math.PI*2);
     ctx.fillStyle = '#ffffff'; ctx.fill();
-    ctx.beginPath(); ctx.arc(cx, cy, 12*s*512, 0, Math.PI*2);
+    ctx.beginPath(); ctx.arc(cx, cy, 16*u, 0, Math.PI*2);
     ctx.fillStyle = '#007aff'; ctx.fill();
 
     return c.toDataURL('image/png');
