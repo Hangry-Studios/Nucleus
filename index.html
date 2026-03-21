@@ -2,11 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Nucleus">
-<meta name="theme-color" content="#000000">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <meta name="mobile-web-app-capable" content="yes">
 <title>Nucleus</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -116,15 +117,20 @@ body.dark .dice-arena { background: #1c1c1e; border-color: rgba(84,84,88,0.5); }
   position: fixed;
   top: 0; left: 0; right: 0;
   z-index: 200;
-  height: 56px;
+  height: calc(56px + env(safe-area-inset-top));
+  padding-top: env(safe-area-inset-top);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
-  background: rgba(242,242,247,0.82);
+  padding-left: max(20px, env(safe-area-inset-left));
+  padding-right: max(20px, env(safe-area-inset-right));
+  background: rgba(242,242,247,0.96);
   backdrop-filter: blur(20px) saturate(1.8);
   -webkit-backdrop-filter: blur(20px) saturate(1.8);
   border-bottom: 0.5px solid var(--sep);
+}
+body.dark #header {
+  background: rgba(0,0,0,0.96);
 }
 
 .app-name {
@@ -179,8 +185,7 @@ body.dark .dice-arena { background: #1c1c1e; border-color: rgba(84,84,88,0.5); }
 #scroll-wrap {
   position: fixed;
   inset: 0;
-  overflow-y: scroll;
-  scroll-snap-type: y mandatory;
+  overflow: hidden;
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
@@ -190,15 +195,15 @@ body.dark .dice-arena { background: #1c1c1e; border-color: rgba(84,84,88,0.5); }
 .slide {
   width: 100%;
   height: 100dvh;
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 72px 16px 72px;
-  position: relative;
+  padding: calc(56px + env(safe-area-inset-top) + 16px) 16px calc(16px + env(safe-area-inset-bottom));
+  position: absolute;
+  left: 0; right: 0;
   overflow: hidden;
+  will-change: transform;
 }
 
 /* Per-game backgrounds — subtle gradient meshes */
@@ -1253,59 +1258,171 @@ function animBal(from, to, up) {
 /* ═══════════════════════════
    SCROLL
 ═══════════════════════════ */
-function scrollNext() {
-  const sw = document.getElementById('scroll-wrap');
-  const cur = Math.round(sw.scrollTop / window.innerHeight);
-  const next = cur + 1;
-  sw.scrollTo({ top: next * window.innerHeight, behavior: 'smooth' });
-}
 
+// ═══════════════════════════════════════════
+// SMOOTH TIKTOK-STYLE SCROLL ENGINE
+// ═══════════════════════════════════════════
+const SCROLL = (() => {
+  let _ready = false;
+  let currentIdx   = 0;
+  let isAnimating  = false;
+  let startY       = 0;
+  let currentY     = 0;
+  let dragging     = false;
+  let dragOffset   = 0;
+  const THRESHOLD  = 0.18; // fraction of vh needed to trigger snap
+  const FRICTION   = 0.22; // resistance while dragging (0=free, 1=frozen)
+
+  let sw, slides;
+
+  function vh() { return window.innerHeight; }
+
+  function getSlide(i) { return slides[Math.min(i, slides.length - 1)]; }
+
+  // Position all slides absolutely
+  function layoutSlides() {
+    slides = sw.querySelectorAll('.slide');
+    slides.forEach((s, i) => {
+      s.style.top = (i * vh()) + 'px';
+    });
+  }
+
+  // Animate sw to show slide at index with spring easing
+  function goTo(idx, instant) {
+    idx = Math.max(0, Math.min(idx, slides.length - 1));
+    currentIdx  = idx;
+    isAnimating = !instant;
+    dragOffset  = 0;
+
+    const target = -idx * vh();
+    if (instant) {
+      sw.style.transition = 'none';
+      sw.style.transform  = `translateY(${target}px)`;
+      isAnimating = false;
+    } else {
+      // Spring-like cubic-bezier
+      sw.style.transition = 'transform 0.52s cubic-bezier(0.22, 1, 0.36, 1)';
+      sw.style.transform  = `translateY(${target}px)`;
+      sw.addEventListener('transitionend', () => {
+        isAnimating = false;
+        sw.style.transition = 'none';
+        // Update dots
+        updateDots();
+        // Append more slides if near end
+        checkAppend();
+      }, { once: true });
+    }
+    updateDots();
+    checkAppend();
+  }
+
+  function updateDots() {
+    const dots = document.getElementById('page-dots');
+    if (!dots) return;
+    const N = 7; // number of game types
+    dots.querySelectorAll('.pdot').forEach((d, i) => {
+      d.classList.toggle('active', i === (currentIdx % N));
+    });
+  }
+
+  function checkAppend() {
+    slides = sw.querySelectorAll('.slide');
+    const N_FACTORIES = 7;
+    if (currentIdx >= slides.length - N_FACTORIES) {
+      // appendRound() is called from init scope — signal via event
+      sw.dispatchEvent(new CustomEvent('nucleus:needmore'));
+    }
+  }
+
+  // ── TOUCH ──
+  function onTouchStart(e) {
+    if (isAnimating) return;
+    dragging  = true;
+    startY    = e.touches[0].clientY;
+    currentY  = startY;
+    dragOffset = 0;
+    sw.style.transition = 'none';
+  }
+
+  function onTouchMove(e) {
+    if (!dragging) return;
+    currentY = e.touches[0].clientY;
+    const delta = currentY - startY;
+    // Block upward scroll completely
+    if (delta > 0) { e.preventDefault(); return; }
+    e.preventDefault();
+    dragOffset = delta * (1 - FRICTION);
+    const base = -currentIdx * vh();
+    sw.style.transform = `translateY(${base + dragOffset}px)`;
+  }
+
+  function onTouchEnd() {
+    if (!dragging) return;
+    dragging = false;
+    const moved = Math.abs(dragOffset);
+    if (dragOffset < -(vh() * THRESHOLD)) {
+      goTo(currentIdx + 1);
+    } else {
+      // Spring back
+      goTo(currentIdx);
+    }
+  }
+
+  // ── MOUSE WHEEL ──
+  let wheelLock = false;
+  function onWheel(e) {
+    e.preventDefault();
+    if (isAnimating || wheelLock) return;
+    if (e.deltaY > 30) {
+      wheelLock = true;
+      goTo(currentIdx + 1);
+      setTimeout(() => { wheelLock = false; }, 600);
+    }
+    // deltaY < 0 = scroll up = ignore (forward-only)
+  }
+
+  // ── KEYBOARD ──
+  function onKey(e) {
+    if (['ArrowDown','PageDown','Space',' '].includes(e.key)) {
+      e.preventDefault();
+      if (!isAnimating) goTo(currentIdx + 1);
+    }
+    if (['ArrowUp','PageUp'].includes(e.key)) e.preventDefault();
+  }
+
+  function init(scrollWrap) {
+    sw = scrollWrap;
+    sw.style.transform  = 'translateY(0)';
+    sw.style.transition = 'none';
+    sw.style.overflow   = 'visible';
+    SCROLL._ready = true;
+    layoutSlides();
+
+    sw.addEventListener('touchstart', onTouchStart, { passive: false });
+    sw.addEventListener('touchmove',  onTouchMove,  { passive: false });
+    sw.addEventListener('touchend',   onTouchEnd,   { passive: true  });
+    sw.addEventListener('wheel',      onWheel,      { passive: false });
+    document.addEventListener('keydown', onKey);
+  }
+
+  function next() {
+    if (!isAnimating) goTo(currentIdx + 1);
+  }
+
+  function relayout() {
+    slides = sw.querySelectorAll('.slide');
+    layoutSlides();
+    // Keep current position
+    sw.style.transition = 'none';
+    sw.style.transform  = `translateY(${-currentIdx * vh()}px)`;
+  }
+
+  return { init, next, relayout, goTo, get _ready() { return _ready; }, set _ready(v) { _ready = v; } };
+})();
+
+function scrollNext() { SCROLL.next(); }
 function autoScrollLoss() { setTimeout(scrollNext, 1500); }
 
-// ── FORWARD-ONLY SCROLL ──
-(function lockScrollForward() {
-  const sw = document.getElementById('scroll-wrap');
-  let lastTop = 0;
-
-  // Track minimum allowed scroll position
-  let minTop = 0;
-
-  sw.addEventListener('scroll', () => {
-    const cur = sw.scrollTop;
-    if (cur < minTop - 2) {
-      // Tried to scroll back — snap forward
-      sw.scrollTo({ top: minTop, behavior: 'instant' });
-    } else {
-      // Snap point reached — lock it in
-      const snapped = Math.round(cur / window.innerHeight) * window.innerHeight;
-      if (Math.abs(cur - snapped) < 4) {
-        minTop = snapped;
-      }
-    }
-    lastTop = sw.scrollTop;
-  }, { passive: true });
-
-  // Block mouse wheel up
-  sw.addEventListener('wheel', (e) => {
-    if (e.deltaY < 0) e.preventDefault();
-  }, { passive: false });
-
-  // Block touch swipe down (to go back up)
-  let touchStartY = 0;
-  sw.addEventListener('touchstart', (e) => {
-    touchStartY = e.touches[0].clientY;
-  }, { passive: true });
-
-  sw.addEventListener('touchmove', (e) => {
-    const deltaY = e.touches[0].clientY - touchStartY;
-    if (deltaY > 0) e.preventDefault(); // swipe down = scroll up = blocked
-  }, { passive: false });
-
-  // Block keyboard up arrows / page up
-  document.addEventListener('keydown', (e) => {
-    if (['ArrowUp','PageUp'].includes(e.key)) e.preventDefault();
-  });
-})();
 
 /* ═══════════════════════════
    WIN / LOSS HANDLERS
@@ -2406,11 +2523,6 @@ function buildPlinko() {
   const sw = document.getElementById('scroll-wrap');
   const N  = factories.length;
 
-  // ── INFINITE SCROLL ENGINE ──
-  // Keep a rolling buffer: always have ~3 rounds ahead.
-  // When user reaches the last round, append a new shuffled round + prune old slides.
-  let totalBuilt = 0; // how many slides have been appended so far
-
   function shuffled(arr) {
     const a = [...arr];
     for (let i = a.length-1; i > 0; i--) {
@@ -2423,15 +2535,16 @@ function buildPlinko() {
   function appendRound() {
     const order = shuffled(factories);
     order.forEach(f => sw.appendChild(f()));
-    totalBuilt += N;
+    // only relayout after SCROLL is initialized
+    if (SCROLL._ready) SCROLL.relayout();
   }
 
-  // Seed with 3 rounds upfront so there's always something to scroll to
+  // Seed with 3 rounds BEFORE init so slides exist in DOM
   appendRound();
   appendRound();
   appendRound();
 
-  // Page dots — always N dots cycling
+  // Page dots
   const dots = document.getElementById('page-dots');
   for (let i = 0; i < N; i++) {
     const d = document.createElement('div');
@@ -2439,17 +2552,14 @@ function buildPlinko() {
     dots.appendChild(d);
   }
 
-  sw.addEventListener('scroll', () => {
-    const idx = Math.round(sw.scrollTop / window.innerHeight);
-    // Update dots (cycling)
-    dots.querySelectorAll('.pdot').forEach((d,i) => d.classList.toggle('active', i===(idx%N)));
+  // Init scroll engine NOW (slides are in DOM)
+  SCROLL.init(sw);
 
-    // When within 1 round of the end — append another round
-    const totalSlides = sw.querySelectorAll('.slide').length;
-    if (idx >= totalSlides - N) {
-      appendRound();
-    }
-  }, {passive: true});
+  // Append more when needed
+  sw.addEventListener('nucleus:needmore', appendRound);
+
+  // Relayout on resize
+  window.addEventListener('resize', () => SCROLL.relayout());
 
   setTimeout(()=>toast(`Welcome  •  ${coins} 🪙 to play with`, true), 700);
 })();
@@ -2561,6 +2671,12 @@ function toggleDark() {
   const dark = document.body.classList.toggle('dark');
   localStorage.setItem('nuc_dark', dark?'1':'0');
   document.getElementById('dm-toggle').textContent = dark ? '☀️' : '🌙';
+  // Update theme-color for status bar
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.remove());
+  const tc = document.createElement('meta');
+  tc.name = 'theme-color';
+  tc.content = dark ? '#000000' : '#f2f2f7';
+  document.head.appendChild(tc);
   SFX.play('click'); HAP.light();
 }
 // init dark mode from storage
