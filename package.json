@@ -1,0 +1,26 @@
+{
+  "name": "nucleus",
+  "version": "1.0.0",
+  "description": "A dopamine-optimized fake casino — TikTok-style.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Hangry-Studios/Nucleus.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Hangry-Studios/Nucleus/issues"
+  },
+  "homepage": "https://github.com/Hangry-Studios/Nucleus#readme",
+  "dependencies": {
+    "@capacitor/cli": "^8.2.0",
+    "@capacitor/core": "^8.2.0",
+    "@capacitor/ios": "^8.2.0"
+  }
+}
