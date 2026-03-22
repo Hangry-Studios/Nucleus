@@ -23,18 +23,24 @@ jobs:
         run: npx cap sync ios
 
 
+      - name: Resolve Swift Package dependencies
+        run: |
+          xcodebuild -resolvePackageDependencies \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App
+
       - name: Build IPA (unsigned)
         run: |
           xcodebuild -workspace ios/App/App.xcworkspace \
             -scheme App \
             -configuration Release \
-            -archivePath build/App.xcarchive \
+            -archivePath $PWD/build/App.xcarchive \
             archive \
             CODE_SIGNING_ALLOWED=NO
 
           xcodebuild -exportArchive \
-            -archivePath build/App.xcarchive \
-            -exportPath build/ipa \
+            -archivePath $PWD/build/App.xcarchive \
+            -exportPath $PWD/build/ipa \
             -exportOptionsPlist exportOptions.plist
 
       - name: Upload IPA
