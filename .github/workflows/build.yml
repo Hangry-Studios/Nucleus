@@ -22,22 +22,14 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync ios
 
-
-      - name: Resolve Swift Package dependencies
-        run: |
-          xcodebuild -resolvePackageDependencies \
-            -workspace ios/App/App.xcworkspace \
-            -scheme App
-
       - name: Build IPA (unsigned)
         run: |
-          xcodebuild -workspace ios/App/App.xcworkspace \
+          xcodebuild -project ios/App/App.xcodeproj \
             -scheme App \
             -configuration Release \
             -archivePath $PWD/build/App.xcarchive \
             archive \
             CODE_SIGNING_ALLOWED=NO
-
           xcodebuild -exportArchive \
             -archivePath $PWD/build/App.xcarchive \
             -exportPath $PWD/build/ipa \
