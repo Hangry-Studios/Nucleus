@@ -22,7 +22,7 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync ios
 
-      - name: Build IPA (unsigned)
+      - name: Build and package IPA
         run: |
           xcodebuild -project ios/App/App.xcodeproj \
             -scheme App \
@@ -30,13 +30,17 @@ jobs:
             -archivePath $PWD/build/App.xcarchive \
             archive \
             CODE_SIGNING_ALLOWED=NO
-          xcodebuild -exportArchive \
-            -archivePath $PWD/build/App.xcarchive \
-            -exportPath $PWD/build/ipa \
-            -exportOptionsPlist exportOptions.plist
+
+          mkdir -p build/ipa/Payload
+          cp -r build/App.xcarchive/Products/Applications/App.app build/ipa/Payload/
+          cd build/ipa
+          zip -r ../Nucleus.ipa Payload
+          cd ../..
+          mkdir -p build/ipa_final
+          mv build/Nucleus.ipa build/ipa_final/
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: Nucleus-IPA
-          path: build/ipa/*.ipa
+          path: build/ipa_final/Nucleus.ipa
